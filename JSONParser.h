@@ -7,6 +7,179 @@
 #include <string>
 
 template< class T > struct CoW;
+template< class T, class Format > struct Serializer;
+
+struct JsonValue {
+    enum Type {
+        Invalid,
+        Null,
+        Boolean,
+        Number,
+        String,
+        Array,
+        Object
+    };
+
+    JsonValue( Type type = Invalid )
+        : type_( type )
+    {}
+
+    JsonValue( Type type, std::string s )
+        : type_( type )
+        , string_( s )
+    {}
+
+    Type type_ = Invalid;
+
+    std::string string_;
+    std::list< JsonValue > array_;
+    std::map< string, JsonValue > object_;
+
+    bool isValid() const { return type_ != Invalid; }
+
+    void insert( std::string key, JsonValue value ) {
+        assert( object_.find( key ) == object_.end() );
+        object_[ key ] = value;
+    }
+
+    void append( JsonValue value ) {
+        array_.push_back( value );
+    }
+
+    template< class T >
+    struct ObjectGetter;
+
+    template<>
+    struct ObjectGetter< bool > {
+        static int get( const JsonValue& value ) {
+            return value.string_.size() > 0;
+        }
+    };
+
+    template<>
+    struct ObjectGetter< int > {
+        static int get( const JsonValue& value ) {
+            return std::stoi( value.string_ );
+        }
+    };
+
+    template<>
+    struct ObjectGetter< std::string > {
+        static std::string get( const JsonValue& value ) {
+            return value.string_;
+        }
+    };
+
+    template< class T >
+    struct ObjectGetter< CoW< T > > {
+        static CoW< T > get( const JsonValue& value ) {
+            CoW< T > result;
+            result.s = T::construct( JsonSerializer( value ) );
+            return result;
+        }
+    };
+
+    template< class T >
+    T get( std::string key ) const {
+        return ObjectGetter< T >::get( object_.at( key ) );
+    }
+
+    template< class T >
+    struct ObjectSetter;
+
+    template<>
+    struct ObjectSetter< int > {
+        static void set( JsonValue& value, int data ) {
+            value.type_ = Number;
+            value.string_ = std::to_string( data );
+        }
+    };
+
+    template<>
+    struct ObjectSetter< std::string > {
+        static void set( JsonValue& value, std::string data ) {
+            value.type_ = String;
+            value.string_ = data;
+        }
+    };
+
+    template< class T >
+    struct ObjectSetter< CoW< T > > {
+        static void set( JsonValue& value, CoW< T > data ) {
+            value.type_ = Object;
+            value.string_ = data.toJson();
+        }
+    };
+
+    template< class T >
+    void set( std::string key, T value ) {
+        return ObjectSetter< T >::set( object_[ key ], value );
+    }
+
+    string toString() const {
+
+        string result;
+
+        switch( type_ )
+        {
+        case JsonValue::Invalid:
+            assert( false );
+            break;
+        case JsonValue::Null:
+            result = "null";
+            break;
+        case JsonValue::Boolean:
+            result = string_.empty() ? "false" : "true";
+            break;
+        case JsonValue::Number:
+            result = string_;
+            break;
+        case JsonValue::String:
+            result = '"';
+            result += ( string_ );
+            result += ( "\"" );
+            break;
+        case JsonValue::Array:
+            result = "[";
+            for( auto i = array_.begin(); i != array_.end(); ++i ) {
+                if( i != array_.begin() ) {
+                    result += ",";
+                }
+                result += i->toString();
+            }
+            result += "]";
+            break;
+        case JsonValue::Object:
+            if( !string_.empty() ) {
+                return string_;
+            }
+            else {
+                result = "{";
+                for( auto i = object_.begin(); i != object_.end(); ++i ) {
+                    if( i != object_.begin() ) {
+                        result += ",";
+                    }
+                    result += "\"";
+                    result += i->first;
+                    result += "\":";
+                    result += i->second.toString();
+                }
+                result += "}";
+            }
+            break;
+        default:
+            assert( false );
+            break;
+        }
+
+        return result;
+    }
+
+    static JsonValue createRoot()
+    {
+        return JsonValue( Object );
+    }
+};
 
 class JsonLexer {
 public:
@@ -167,69 +340,6 @@ private:
     std::string::const_iterator e_;
 };
 
-struct JsonValue {
-    enum Type {
-        Invalid,
-        Null,
-        Boolean,
-        Number,
-        String,
-        Array,
-        Object
-    };
-
-    JsonValue( Type type = Invalid )
-        : type_( type )
-    {}
-
-    JsonValue( Type type, std::string s )
-        : type_( type )
-        , string_( s )
-    {}
-
-    Type type_ = Invalid;
-
-    std::string string_;
-    std::list< JsonValue > array_;
-    std::map< string, JsonValue > object_;
-
-    bool isValid() const { return type_ != Invalid; }
-
-    void insert( std::string key, JsonValue value ) {
-        assert( object_.find( key ) == object_.end() );
-        object_[ key ] = value;
-    }
-
-    void append( JsonValue value ) {
-        array_.push_back( value );
-    }
-
-    template< class T >
-    struct ObjectGetter;
-
-    template<>
-    struct ObjectGetter< int > { static int get( JsonValue& value ) {
-        return std::stoi( value.string_ );
-    } };
-
-    template<>
-    struct ObjectGetter< std::string > { static std::string get( JsonValue& value ) {
-        return value.string_;
-    } };
-
-    template< class T >
-    struct ObjectGetter< CoW< T > > { static CoW< T > get( JsonValue& value ) {
-        CoW< T > result;
-        result.s = T::construct( JsonDeserializer< T >( value ) );
-        return result;
-    } };
-
-    template< class T >
-    T get( std::string key ){
-        return ObjectGetter< T >::get( object_[ key ] );
-    }
-};
-
 class JsonParser {
 public:
     JsonParser( std::string json )
@@ -358,25 +468,7 @@ private:
     std::string json_;
 };
 
-template< class T >
-struct JsonDeserializer {
-    JsonDeserializer( std::string json )
-        : json_( JsonParser( json ).parse() )
-    {}
 
-    JsonDeserializer( JsonValue json )
-        : json_( json )
-    {}
-
-    template< class R, R T::*m >
-    R get( std::string key ) {
-        return json_.get< R >( key );
-    }
-
-    JsonValue json_;
-};
-
-template< class T >
 struct JsonSerializer {
     JsonSerializer( std::string json )
         : json_( JsonParser( json ).parse() )
@@ -386,9 +478,14 @@ struct JsonSerializer {
         : json_( json )
     {}
 
-    template< class R, R T::*m >
-    R get( std::string key ) {
+    template< class R >
+    R get( std::string key ) const {
         return json_.get< R >( key );
+    }
+
+    template< class R >
+    void set( std::string key, R value ) {
+        json_.set< R >( key, value );
     }
 
     JsonValue json_;

@@ -26,7 +26,7 @@ using namespace std;
 #define ADD_FIELDS_3( name, op, field, ... ) ADD_FIELD( name, field ) op EXPAND_VA( ADD_FIELDS_2( name, op, __VA_ARGS__ ) )
 #define ADD_FIELDS_4( name, op, field, ... ) ADD_FIELD( name, field ) op EXPAND_VA( ADD_FIELDS_3( name, op, __VA_ARGS__ ) )
 
-#define CONSTRUCT_FIELD( name, field ) m.template get< decltype( name::field ), &name::field > ( #field )
+#define CONSTRUCT_FIELD( name, field ) m.template get< decltype( name::field ) > ( #field )
 
 #define CONSTRUCT_FIELDS_0( name, op )
 #define CONSTRUCT_FIELDS_1( name, field ) CONSTRUCT_FIELD( name, field )
@@ -53,9 +53,9 @@ template< class TT > static name construct( TT&& m ) { \
 
 template< class T > struct Printer;
 template< class T > struct Comparer;
-template< class T > struct JsonSerializer;
-template< class T > struct JsonDeserializer;
-
+struct JsonSerializer;
+struct JsonValue;
+template< class T, class Format > struct Serializer;
 
 template< class T >
 struct CoW {
@@ -67,16 +67,18 @@ struct CoW {
     }
 
     bool is_equal_to( const T& other ) const {
-        return T::visit_if( Comparer< T >( s, other ) );
+        return &s == &other || T::visit_if( Comparer< T >( s, other ) );
     }
 
-    string toJson() {
-        return T::visit_all( JsonSerializer< T >( s ) );
+    string toJson() const {
+        Serializer< T, JsonValue > serializer( s );
+        T::visit_all( serializer );
+        return serializer.result().toString();
     }
 
     static CoW< T > fromJson( string json ) {
         CoW< T > result;
-        result.s = T::construct( JsonDeserializer< T >( json ) );
+        result.s = T::construct( JsonSerializer( json ) );
         return result;
     }
 
@@ -141,6 +143,26 @@ struct Comparer {
     const T& lhs_;
     const T& rhs_;
 };
+
+template< class T, class Format >
+struct Serializer {
+    Serializer( const T& ref ) : ref_( ref ), format_( Format::createRoot() ) {}
+
+    void init( string ) {
+        ;
+    }
+
+    template< class R, R T::*m >
+    void visit( string name ){
+        format_.set( name, ref_.*m );
+    }
+
+    Format result() const { return format_; }
+
+    const T& ref_;
+    Format format_;
+};
+
 
 template< class R > struct is_container {
     typedef char YES[1];

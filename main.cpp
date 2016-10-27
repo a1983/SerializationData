@@ -37,6 +37,8 @@ int main( int /*argc*/, char* /*argv*/[] ) {
 
     auto t2 = t;
 
+    cout << t2.toJson() << endl;
+
     assert( t.is_equal_to( t ) );
     assert( t.is_equal_to( t2 ) );
 
@@ -44,6 +46,8 @@ int main( int /*argc*/, char* /*argv*/[] ) {
     assert( !t.is_equal_to( t2 ) );
 
     t.print();
+
+    string dummy; cin >> dummy;
 
     return 0;
 }
