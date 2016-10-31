@@ -6,7 +6,7 @@
 #include <map>
 #include <string>
 
-template< class T > struct CoW;
+template< class T > struct Object;
 template< class T, class Format > struct Serializer;
 
 struct JsonValue {
@@ -17,7 +17,7 @@ struct JsonValue {
         Number,
         String,
         Array,
-        Object
+        TypeObject
     };
 
     JsonValue( Type type = Invalid )
@@ -71,11 +71,9 @@ struct JsonValue {
     };
 
     template< class T >
-    struct ObjectGetter< CoW< T > > {
-        static CoW< T > get( const JsonValue& value ) {
-            CoW< T > result;
-            result.s = T::construct( JsonSerializer( value ) );
-            return result;
+    struct ObjectGetter< Object< T > > {
+        static Object< T > get( const JsonValue& value ) {
+            return Object< T >( T::construct( JsonSerializer( value ) ) );
         }
     };
 
@@ -104,9 +102,9 @@ struct JsonValue {
     };
 
     template< class T >
-    struct ObjectSetter< CoW< T > > {
-        static void set( JsonValue& value, CoW< T > data ) {
-            value.type_ = Object;
+    struct ObjectSetter< Object< T > > {
+        static void set( JsonValue& value, Object< T > data ) {
+            value.type_ = TypeObject;
             value.string_ = data.toJson();
         }
     };
@@ -149,7 +147,7 @@ struct JsonValue {
             }
             result += "]";
             break;
-        case JsonValue::Object:
+        case JsonValue::TypeObject:
             if( !string_.empty() ) {
                 return string_;
             }
@@ -177,7 +175,7 @@ struct JsonValue {
 
     static JsonValue createRoot()
     {
-        return JsonValue( Object );
+        return JsonValue( TypeObject );
     }
 };
 
@@ -363,7 +361,7 @@ public:
             return JsonValue();
         }
 
-        JsonValue object{ JsonValue::Object };
+        JsonValue object{ JsonValue::TypeObject };
 
         do {
             JsonLexer::Token next = lexer.next();
