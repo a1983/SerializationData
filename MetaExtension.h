@@ -6,6 +6,7 @@
 #include <vector>
 #include <memory>
 #include <type_traits>
+
 #include <assert.h>
 
 #include "CoW.h"
@@ -17,15 +18,28 @@ using namespace std;
 template< class T > struct Printer;
 template< class T > struct Comparer;
 template< class T, class Format > struct Serializer;
-struct JsonSerializer;
+class JsonParser;
 struct JsonValue;
 
 template< class T >
 struct Object : public CoW< T > {
     Object() = default;
-    Object( const T& value ) : CoW< T >( value ){}
+    
     Object( const Object& other ) = default;
     Object& operator=( const Object& other ) = default;
+
+    Object( const T& value )
+        : CoW< T >( value )
+    {
+        ;
+    }
+
+    template< class M0, class... M >
+    Object( M0 arg0, M... args )
+        : CoW< T >( T{ arg0, args... } )
+    {
+        ;
+    }
     
     void print( int level = 0 ) const {
         T::visit_all( Printer< T >( const_data(), level ) );
@@ -42,7 +56,7 @@ struct Object : public CoW< T > {
     }
 
     static Object fromJson( string json ) {
-        return Object( T::construct( JsonSerializer( json ) ) );
+        return Object( T::construct( JsonParser( json ).parse() ) );
     }
 };
 
@@ -96,6 +110,23 @@ struct Comparer {
     struct ObjectComparer< Object< R > > {
         static bool compare( const Object< R >& lhs, const Object< R >& rhs ) {
             return lhs.is_equal_to( rhs );
+        }
+    };
+
+    template< class R >
+    struct ObjectComparer< vector< R > > {
+        static bool compare( const vector< R >& lhs, const vector< R >& rhs ) {
+            if( lhs.size() != rhs.size() ) {
+                return false;
+            }
+
+            for( size_t i = 0; i < lhs.size(); ++i ) {
+                if( !ObjectComparer< R >::compare( lhs[ i ], rhs[ i ] ) ) {
+                    return false;
+                }
+            }
+
+            return true;
         }
     };
 

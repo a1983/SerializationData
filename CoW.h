@@ -1,7 +1,9 @@
 #ifndef CoW_H
 #define CoW_H
 
+#include <assert.h>
 #include <atomic>
+#include <thread>
 
 template< class T >
 class CoW {
@@ -16,6 +18,9 @@ class CoW {
 
         Holder( const T& data ) : ref_( 1 ), data_( data ) {
         }
+
+        Holder( const Holder& ) = delete;
+        Holder& operator=( const Holder& ) = delete;
 
         ~Holder()
         {
@@ -42,9 +47,9 @@ public:
     using Type = T;
 
     CoW()
-        : holder_( new Holder() )
+        : holder_( &default_holder_ )
     {
-        ;
+        ref();
     }
 
     ~CoW() {
@@ -97,6 +102,10 @@ public:
         return holder_->is_detached();
     }
 
+    bool is_default() const {
+        return holder_ == &default_holder_;
+    }
+
 private:
     void detach() {
         if( !is_detached() ) {
@@ -117,6 +126,11 @@ private:
     }
 
     Holder* holder_;
+
+    static Holder default_holder_;
 };
+
+template< class T >
+typename CoW< T >::Holder CoW< T >::default_holder_;
 
 #endif // CoW_H

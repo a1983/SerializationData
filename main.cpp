@@ -9,26 +9,44 @@
 #include "JSONParser.h"
 
 struct RecordData {
-    DECLARE( RecordData, id, name )
-
     int id;
     string name;
     vector< int > data;
+
+    DECLARE( RecordData, id, name )
 };
 
 using Record = Object< RecordData >;
 
 struct Record2Data {
-    DECLARE( Record2Data, id, name, data )
-
     int id;
     string name;
     Record data;
+
+    DECLARE( Record2Data, id, name, data )
 };
 
 using Record2 = Object< Record2Data >;
 
+struct AccountData {
+    bool isOpened;
+    int value;
+
+    DECLARE( AccountData, isOpened, value );
+};
+
+using Account = Object< AccountData >;
+
+struct AccountStorageData {
+    vector< Account > accounts;
+
+    DECLARE( AccountStorageData, accounts );
+};
+
+using AccountStorage = Object< AccountStorageData >;
+
 int main( int /*argc*/, char* /*argv*/[] ) {
+
     auto t = Record2::fromJson(
                 "{"
                 "  \"id\":1,"
@@ -55,20 +73,22 @@ int main( int /*argc*/, char* /*argv*/[] ) {
     start = std::chrono::system_clock::now();
     
     int acc = 0;
-    for( int i = 0; i < 10000000; ++i ) {
-        Record test = t->data;
+    for( int i = 0; i < 100; ++i ) {
+        Record test;
+        test = t->data;
         acc += test->id;
         if( i % 10 ) {
             test().id += 1;
         }
     }
 
-    end = std::chrono::system_clock::now();
-    std::chrono::duration<double> elapsed_seconds = end - start;
-    
-    std::cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
+    AccountStorage storage{ vector< int > {
+            Account{ true, 100 },
+            Account{ true, 50 }
+        }
+    };
 
-    string dummy; cin >> dummy;
+    string dummy; std::cin >> dummy;
 
     return 0;
 }

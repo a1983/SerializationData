@@ -49,10 +49,21 @@ struct JsonValue {
     template< class T >
     struct ObjectGetter;
 
+    template< class T >
+    struct ObjectSetter;
+
     template<>
     struct ObjectGetter< bool > {
-        static int get( const JsonValue& value ) {
+        static bool get( const JsonValue& value ) {
             return value.string_.size() > 0;
+        }
+    };
+
+    template<>
+    struct ObjectSetter< bool > {
+        static void set( JsonValue& value, bool data ) {
+            value.type_ = Boolean;
+            value.string_ = data ? "1" : "";
         }
     };
 
@@ -64,32 +75,17 @@ struct JsonValue {
     };
 
     template<>
-    struct ObjectGetter< std::string > {
-        static std::string get( const JsonValue& value ) {
-            return value.string_;
-        }
-    };
-
-    template< class T >
-    struct ObjectGetter< Object< T > > {
-        static Object< T > get( const JsonValue& value ) {
-            return Object< T >( T::construct( JsonSerializer( value ) ) );
-        }
-    };
-
-    template< class T >
-    T get( std::string key ) const {
-        return ObjectGetter< T >::get( object_.at( key ) );
-    }
-
-    template< class T >
-    struct ObjectSetter;
-
-    template<>
     struct ObjectSetter< int > {
         static void set( JsonValue& value, int data ) {
             value.type_ = Number;
             value.string_ = std::to_string( data );
+        }
+    };
+
+    template<>
+    struct ObjectGetter< std::string > {
+        static std::string get( const JsonValue& value ) {
+            return value.string_;
         }
     };
 
@@ -102,12 +98,50 @@ struct JsonValue {
     };
 
     template< class T >
+    struct ObjectGetter< Object< T > > {
+        static Object< T > get( const JsonValue& value ) {
+            return Object< T >( T::construct( value ) );
+        }
+    };
+
+    template< class T >
     struct ObjectSetter< Object< T > > {
         static void set( JsonValue& value, Object< T > data ) {
             value.type_ = TypeObject;
             value.string_ = data.toJson();
         }
     };
+
+    template< class T >
+    struct ObjectGetter< vector< T > > {
+        static vector< T > get( const JsonValue& value ) {
+            vector< T > result;
+
+            for( auto c = value.array_.cbegin(); c != value.array_.cend(); ++c ) {
+                result.push_back( ObjectGetter< T >::get( *c ) );
+            }
+
+            return result;
+        }
+    };
+
+    template< class T >
+    struct ObjectSetter< vector< T > > {
+        static void set( JsonValue& value, vector< T > data ) {
+            value.type_ = Array;
+            value.array_.clear();
+            for( auto c = data.begin(); c != data.end(); ++c ) {
+                JsonValue item;
+                ObjectSetter< T >::set( item, *c );
+                value.array_.push_back( item );
+            }
+        }
+    };
+
+    template< class T >
+    T get( std::string key ) const {
+        return ObjectGetter< T >::get( object_.at( key ) );
+    }
 
     template< class T >
     void set( std::string key, T value ) {
@@ -267,7 +301,7 @@ public:
     }
 
     Token tryGet( const char* text, TokenType token ) {
-        std::string::const_iterator begin = i_ + 1;
+        std::string::const_iterator begin = ++i_;
         const char* c = text + 1;
         do {
             if( i_ == e_ ) {
@@ -277,9 +311,9 @@ public:
             if( *i_ != *c ) {
                 return Token{ TT_ERROR, begin, i_ };
             }
-        } while( ++i_, ++c );
+        } while( ++i_, *( ++c ) );
 
-        return Token{ token, begin, i_++ };
+        return Token{ token, begin, i_ };
     }
 
     void consumeDigits()
@@ -464,29 +498,6 @@ public:
 
 private:
     std::string json_;
-};
-
-
-struct JsonSerializer {
-    JsonSerializer( std::string json )
-        : json_( JsonParser( json ).parse() )
-    {}
-
-    JsonSerializer( JsonValue json )
-        : json_( json )
-    {}
-
-    template< class R >
-    R get( std::string key ) const {
-        return json_.get< R >( key );
-    }
-
-    template< class R >
-    void set( std::string key, R value ) {
-        json_.set< R >( key, value );
-    }
-
-    JsonValue json_;
 };
 
 #endif // JSONPARSER_H
