@@ -15,6 +15,19 @@
 
 using namespace std;
 
+template< class R > struct is_iterable {
+    typedef char YES[ 1 ];
+    typedef char NO[ 2 ];
+    template< class T > static YES& check( void*, typename T::iterator* = nullptr );
+    template< class T > static NO & check( ... );
+    enum {
+        value = sizeof( check< R >( nullptr ) ) == sizeof( YES )
+    };
+};
+
+template< bool is, class T = void >
+using if_t = typename enable_if< is, T >::type;
+
 template< class T > struct Printer;
 template< class T > struct Comparer;
 template< class T, class Format > struct Serializer;
@@ -113,26 +126,24 @@ struct Comparer {
         }
     };
 
-    template< class R >
-    struct ObjectComparer< vector< R > > {
-        static bool compare( const vector< R >& lhs, const vector< R >& rhs ) {
-            if( lhs.size() != rhs.size() ) {
-                return false;
-            }
-
-            for( size_t i = 0; i < lhs.size(); ++i ) {
-                if( !ObjectComparer< R >::compare( lhs[ i ], rhs[ i ] ) ) {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-    };
+    template< class R, R T::*m >
+    if_t< !is_iterable< R >::value, bool > visit( string ){
+        return ObjectComparer< R >::compare( lhs_.*m, rhs_.*m );
+    }
 
     template< class R, R T::*m >
-    bool visit( string ){
-        return ObjectComparer< R >::compare( lhs_.*m, rhs_.*m );
+    if_t< is_iterable< R >::value, bool > visit( string ) {
+        R::const_iterator li = begin( lhs_.*m ), le = end( lhs_.*m );
+        R::const_iterator ri = begin( rhs_.*m ), re = end( rhs_.*m );
+        while( li != le ) {
+            if( ri == re || *li != *ri ) {
+                return false;
+            }
+            ++li;
+            ++ri;
+        }
+
+        return ri == re;
     }
 
     const T& lhs_;
@@ -156,17 +167,6 @@ struct Serializer {
 
     const T& ref_;
     Format format_;
-};
-
-
-template< class R > struct is_container {
-    typedef char YES[1];
-    typedef char NO [2];
-    template< class T > static YES& check( typename T::iterator* );
-    template< class T > static NO & check( ... );
-    enum {
-        value = sizeof( check< R >( nullptr ) ) == sizeof( YES )
-    };
 };
 
 #endif // METAEXTENSION_H

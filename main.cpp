@@ -82,7 +82,7 @@ int main( int /*argc*/, char* /*argv*/[] ) {
         }
     }
 
-    AccountStorage storage{ vector< int > {
+    AccountStorage storage{ vector< Account > {
             Account{ true, 100 },
             Account{ true, 50 }
         }
