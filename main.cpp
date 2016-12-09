@@ -13,7 +13,7 @@ struct RecordData {
     string name;
     vector< int > data;
 
-    DECLARE( RecordData, id, name )
+    MD_DECLARE( RecordData, id, name )
 };
 
 using Record = Object< RecordData >;
@@ -23,7 +23,7 @@ struct Record2Data {
     string name;
     Record data;
 
-    DECLARE( Record2Data, id, name, data )
+    MD_DECLARE( Record2Data, id, name, data )
 };
 
 using Record2 = Object< Record2Data >;
@@ -32,20 +32,21 @@ struct AccountData {
     bool isOpened;
     int value;
 
-    DECLARE( AccountData, isOpened, value );
+    MD_DECLARE( AccountData, isOpened, value );
 };
 
 using Account = Object< AccountData >;
 
 struct AccountStorageData {
+    int id;
     vector< Account > accounts;
 
-    DECLARE( AccountStorageData, accounts );
+    MD_DECLARE( AccountStorageData, id, accounts );
 };
 
 using AccountStorage = Object< AccountStorageData >;
 
-int main( int /*argc*/, char* /*argv*/[] ) {
+int main( int /*argc*/, char* /*argv*/[] ) {   
 
     auto t = Record2::fromJson(
                 "{"
@@ -68,9 +69,6 @@ int main( int /*argc*/, char* /*argv*/[] ) {
     assert( t2.is_equal_to( t_json ) );
 
     t.print();
-
-    std::chrono::time_point<std::chrono::system_clock> start, end;
-    start = std::chrono::system_clock::now();
     
     int acc = 0;
     for( int i = 0; i < 100; ++i ) {
@@ -82,7 +80,7 @@ int main( int /*argc*/, char* /*argv*/[] ) {
         }
     }
 
-    AccountStorage storage{ vector< Account > {
+    AccountStorage storage{ 0, vector< Account > {
             Account{ true, 100 },
             Account{ true, 50 }
         }

@@ -28,6 +28,12 @@ template< class R > struct is_iterable {
 template< bool is, class T = void >
 using if_t = typename enable_if< is, T >::type;
 
+template< class T, class R >
+using if_iterable_t = if_t< is_iterable< T >::value, R >;
+
+template< class T, class R >
+using if_not_iterable_t = if_t< !is_iterable< T >::value, R >;
+
 template< class T > struct Printer;
 template< class T > struct Comparer;
 template< class T, class Format > struct Serializer;
@@ -41,8 +47,8 @@ struct Object : public CoW< T > {
     Object( const Object& other ) = default;
     Object& operator=( const Object& other ) = default;
 
-    Object( const T& value )
-        : CoW< T >( value )
+    Object( T&& value )
+        : CoW< T >( std::move( value ) )
     {
         ;
     }
@@ -114,8 +120,24 @@ struct Comparer {
 
     template< class R >
     struct ObjectComparer {
-        static bool compare( const R& lhs, const R& rhs ) {
+        template< class T >
+        static if_not_iterable_t< T, bool > compare( const T& lhs, const T& rhs ) {
             return lhs == rhs;
+        }
+
+        template< class T >
+        static if_iterable_t< T, bool > compare( const T& lhs, const T& rhs ) {
+            T::const_iterator li = begin( lhs ), le = end( lhs );
+            T::const_iterator ri = begin( rhs ), re = end( rhs );
+            while( li != le ) {
+                if( ri == re || *li != *ri ) {
+                    return false;
+                }
+                ++li;
+                ++ri;
+            }
+
+            return ri == re;
         }
     };
 
@@ -127,23 +149,8 @@ struct Comparer {
     };
 
     template< class R, R T::*m >
-    if_t< !is_iterable< R >::value, bool > visit( string ){
+    bool visit( string ){
         return ObjectComparer< R >::compare( lhs_.*m, rhs_.*m );
-    }
-
-    template< class R, R T::*m >
-    if_t< is_iterable< R >::value, bool > visit( string ) {
-        R::const_iterator li = begin( lhs_.*m ), le = end( lhs_.*m );
-        R::const_iterator ri = begin( rhs_.*m ), re = end( rhs_.*m );
-        while( li != le ) {
-            if( ri == re || *li != *ri ) {
-                return false;
-            }
-            ++li;
-            ++ri;
-        }
-
-        return ri == re;
     }
 
     const T& lhs_;
