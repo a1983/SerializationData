@@ -61,6 +61,7 @@ int main( int /*argc*/, char* /*argv*/[] ) {
     auto t2 = t;
     assert( t.is_equal_to( t ) );
     t2().id = 42;
+    t2().data().data.push_back( 42 );
     assert( !t.is_equal_to( t2 ) );
 
     string json = t2.toJson();
@@ -68,7 +69,7 @@ int main( int /*argc*/, char* /*argv*/[] ) {
     assert( t_json.is_equal_to( t2 ) );
     assert( t2.is_equal_to( t_json ) );
 
-    t.print();
+    t2.print();
     
     int acc = 0;
     for( int i = 0; i < 100; ++i ) {
@@ -85,6 +86,8 @@ int main( int /*argc*/, char* /*argv*/[] ) {
             Account{ true, 50 }
         }
     };
+
+    cout << storage.toJson() << endl;
 
     string dummy; std::cin >> dummy;
 

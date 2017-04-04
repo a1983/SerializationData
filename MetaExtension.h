@@ -25,14 +25,11 @@ template< class R > struct is_iterable {
     };
 };
 
-template< bool is, class T = void >
-using if_t = typename enable_if< is, T >::type;
+template< class T, class R >
+using if_iterable_t = typename enable_if< is_iterable< T >::value, R >::type;
 
 template< class T, class R >
-using if_iterable_t = if_t< is_iterable< T >::value, R >;
-
-template< class T, class R >
-using if_not_iterable_t = if_t< !is_iterable< T >::value, R >;
+using if_not_iterable_t = typename enable_if< !is_iterable< T >::value, R >::type;
 
 template< class T > struct Printer;
 template< class T > struct Comparer;
@@ -82,14 +79,39 @@ struct Object : public CoW< T > {
 template< class T >
 struct Printer {
     Printer( const T& ref, int level ) : ref_( ref ), level_( level ) {}
+    ~Printer() {
+        cout << string( level_ * 4, ' ' ) << "}" << endl;
+    }
 
     void init( string name ) {
-        cout << string( level_ * 4, ' ' ) << name << ": " << endl;
+        cout << string( level_ * 4, ' ' ) << name << ": {" << endl;
     }
 
     template< class R >
     struct ObjectPrinter {
-        static void print( const string& name, const R& value, int level ) {
+        template< class U >
+        static void print_array_item( const U& value, int level ) {
+            ObjectPrinter< U >::print( "", value, level );
+        }
+
+        template< class U >
+        static if_iterable_t< U, void > print( const string& name, const U& value, int level ) {
+            cout << string( level * 4 + 2, ' ' ) << name << ": [" << endl;
+            for( U::const_iterator i = begin( value ), e = end( value ); i != e; ++i ) {
+                print_array_item( *i, level );
+            }
+            cout << string( level * 4 + 2, ' ' ) << "]" << endl;
+        }
+
+        template< class U >
+        static if_not_iterable_t< U, void > print( const string& name, const U& value, int level ) {
+            cout << string( level * 4 + 2, ' ' ) << name << ": " << value << endl;
+        }
+    };
+
+    template<>
+    struct ObjectPrinter< string > {
+        static void print( const string& name, const string& value, int level ) {
             cout << string( level * 4 + 2, ' ' ) << name << ": " << value << endl;
         }
     };
@@ -121,23 +143,8 @@ struct Comparer {
     template< class R >
     struct ObjectComparer {
         template< class T >
-        static if_not_iterable_t< T, bool > compare( const T& lhs, const T& rhs ) {
+        static bool compare( const T& lhs, const T& rhs ) {
             return lhs == rhs;
-        }
-
-        template< class T >
-        static if_iterable_t< T, bool > compare( const T& lhs, const T& rhs ) {
-            T::const_iterator li = begin( lhs ), le = end( lhs );
-            T::const_iterator ri = begin( rhs ), re = end( rhs );
-            while( li != le ) {
-                if( ri == re || *li != *ri ) {
-                    return false;
-                }
-                ++li;
-                ++ri;
-            }
-
-            return ri == re;
         }
     };
 

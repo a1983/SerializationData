@@ -168,8 +168,8 @@ struct JsonValue {
             break;
         case JsonValue::String:
             result = '"';
-            result += ( string_ );
-            result += ( "\"" );
+            result += string_;
+            result += "\"";
             break;
         case JsonValue::Array:
             result = "[";
